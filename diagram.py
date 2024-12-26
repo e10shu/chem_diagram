@@ -1,6 +1,9 @@
+import io
+import base64
 import matplotlib.pyplot as plt
 import numpy as np
 from datetime import datetime
+
 
 class Group:
     def __init__(self, name, homo, lumo, color = ""):
@@ -17,7 +20,7 @@ class Diagram:
         self.y = y
         self.groups = groups
 
-    def plot(self,path):
+    def base64(self):
         labels = list(map(lambda g: g.name,self.groups))
         ticks = np.arange(0.5, len(labels)*2, 2)
         plt.xticks(ticks, labels)
@@ -41,13 +44,13 @@ class Diagram:
             plt.plot(x, lumo_y, color=group.color)
             pre_index += 1
 
-        plt.savefig(path)
+        bytes = io.BytesIO()
+        plt.savefig(bytes, format='jpg')
         plt.close()
-        #plt.show()
+        bytes.seek(0)
+        jpg_data = base64.b64encode(bytes.read()).decode()
 
-if __name__ == '__main__':
-    d = Diagram("","",[])
-    d.plot("")
+        return jpg_data
 
 
 
