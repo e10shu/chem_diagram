@@ -1,14 +1,36 @@
 import base64
-from datetime import datetime
 from typing import List
 
 import flet as ft
 
 from diagram import Group, Diagram
 
+class ErrorDialog(ft.AlertDialog):
+    def __init__(self,page:ft.Page,text:str):
+        super().__init__()
+        self.page = page
+        self.title = ft.Text("Error")
+        self.modal = True
+        self.content = ft.Column([
+            ft.Text(text),
+        ])
+        self.actions = [
+            ft.TextButton("Close", on_click = lambda x: self.__close())
+        ]
+        self.actions_alignment = ft.MainAxisAlignment.END
+
+    def show(self):
+        self.page.open(self)
+        self.page.update()
+
+    def __close(self):
+        self.page.close(self)
+        self.page.update()
+
 class OrbitalsTable(ft.DataTable):
-    def __init__(self,img : ft.Image):
+    def __init__(self,page:ft.Page,img : ft.Image):
         super().__init__(columns=[])
+        self.error_dialog = ErrorDialog(page,"There are invalid values in the form")
         self.img_element = img
         self.x_text = ""
         self.y_text = ""
@@ -59,8 +81,15 @@ class OrbitalsTable(ft.DataTable):
             self.name
         ]
 
-    def delete_orbital(self, id: str,x: str, y: str):
-        self.orbitals = [i for i in self.orbitals if i.id != id]
+    def update_xy(self,x:str,y:str):
+        self.x_text = x
+        self.y_text = y
+
+        self.update_diagram()
+        self.update()
+
+    def delete_orbital(self, orbital_id: str):
+        self.orbitals = [i for i in self.orbitals if i.id != orbital_id]
 
         new_rows = []
         for row in self.rows:
@@ -77,7 +106,7 @@ class OrbitalsTable(ft.DataTable):
 
         self.rows = new_rows
 
-        self.update_diagram(x,y)
+        self.update_diagram()
         self.update()
 
     def __orbital_to_element(self,orbital:Group):
@@ -92,20 +121,23 @@ class OrbitalsTable(ft.DataTable):
                 ]
             )
 
-    def add_orbital(self):
-        orbital = Group(self.name.value,self.homo.value,self.lumo.value,color=self.color.value)
-        self.orbitals.append(orbital)
+    def add_orbital(self,_):
+        if "" in [self.name.value, self.homo.value, self.lumo.value, self.color.value]:
+            self.error_dialog.show()
+        else:
+            orbital = Group(self.name.value,self.homo.value,self.lumo.value,color=self.color.value)
+            self.orbitals.append(orbital)
 
-        self.rows.append(self.__orbital_to_element(orbital))
+            self.rows.append(self.__orbital_to_element(orbital))
 
-        self.name.value = ""
-        self.homo.value = ""
-        self.lumo.value = ""
-        self.color.value = ""
-        self.name.focus()
+            self.name.value = ""
+            self.homo.value = ""
+            self.lumo.value = ""
+            self.color.value = ""
+            self.name.focus()
 
-        self.update_diagram()
-        self.update()
+            self.update_diagram()
+            self.update()
 
     def update_diagram(self):
         diagram = Diagram(self.x_text,self.y_text,self.orbitals)
@@ -119,8 +151,7 @@ class OrbitalsTable(ft.DataTable):
 
     def add_button_setup(self):
         self.add_button.on_click = self.add_orbital
-
-
+        self.update()
 
 def main(page):
     graph_x = ft.TextField(label="x")
@@ -132,14 +163,9 @@ def main(page):
         height=400,
         fit=ft.ImageFit.CONTAIN,
     )
-    orbitals_table = OrbitalsTable(img)
-    orbitals_table.add_button_setup()
+    orbitals_table = OrbitalsTable(page,img)
 
-    def apply_xy_text(_):
-        orbitals_table.x_text = graph_x.value
-        orbitals_table.y_text = graph_y.value
-
-    apply_button = ft.ElevatedButton("apply",on_click=apply_xy_text)
+    apply_button = ft.ElevatedButton("apply",on_click=lambda _: orbitals_table.update_xy(graph_x.value,graph_y.value))
 
     def on_file_picked(e: ft.FilePickerResultEvent):
         orbitals_table.save_diagram(e.path)
@@ -148,7 +174,7 @@ def main(page):
     file_picker = ft.FilePicker(on_result=on_file_picked)
     page.overlay.append(file_picker)
 
-    def show_file_picker(e):
+    def show_file_picker(_):
         file_picker.save_file(
             file_name="diagram.png",
             file_type=ft.FilePickerFileType.CUSTOM, allowed_extensions=['png']
@@ -176,6 +202,6 @@ def main(page):
     )
 
     page.controls.append(img)
-
+    orbitals_table.add_button_setup()
 
 ft.app(target=main)
